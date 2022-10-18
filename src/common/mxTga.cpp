@@ -20,6 +20,10 @@
 mxImage *
 mxTgaRead (const char *filename)
 {
+#ifdef KINGPIN //tga RLE and 32bit loading
+	byte bufIdx = 0, RLE = 0;
+	byte buff[3] = { 0, 0,0 };
+#endif
 	FILE *file;
 	file = fopen (filename, "rb");
 	if (!file)
@@ -42,8 +46,14 @@ mxTgaRead (const char *filename)
 
 	// only 24-bit RGB uncompressed
 	if (colorMapType != 0 ||
+#ifdef KINGPIN
+		(imageTypeCode != 2 && imageTypeCode != 10)||
+		(pixelSize != 24 && pixelSize != 32)
+#else
 		imageTypeCode != 2 ||
-		pixelSize != 24)
+		pixelSize != 24
+#endif
+		)
 	{
 		fclose (file);
 		return 0;
@@ -65,10 +75,41 @@ mxTgaRead (const char *filename)
 		byte *scanline = (byte *) &data[(height - y - 1) * width * 3];
 		for (int x = 0; x < width; x++)
 		{
-			scanline[x * 3 + 2] = (byte) fgetc (file);
-			scanline[x * 3 + 1] = (byte) fgetc (file);
-			scanline[x * 3 + 0] = (byte) fgetc (file);
+#ifdef KINGPIN
+			if (imageTypeCode == 10)
+			{
+				if (bufIdx == 0 || !RLE)
+				{
+					if (bufIdx == 0) {
+						bufIdx = fgetc(file); //get repetition count
+						RLE = (bufIdx & 128) ? 1 : 0;
+						bufIdx &= ~128;
+					}
+					else
+						bufIdx--; //allow 1 extra pixel
+
+					fread(&buff, sizeof(buff), 1, file); //get RGB value
+					if (pixelSize == 32)
+						fgetc(file); //discard alpha data
+				}
+				else //allow 1 extra pixel
+					bufIdx--; //+127 Run-length Packet.
+
+				scanline[x * 3 + 2] = buff[0];
+				scanline[x * 3 + 1] = buff[1];
+				scanline[x * 3 + 0] = buff[2];
+			} 
+			else {
+#endif
+			scanline[x * 3 + 2] = (byte)fgetc(file);
+			scanline[x * 3 + 1] = (byte)fgetc(file);
+			scanline[x * 3 + 0] = (byte)fgetc(file);
 			//scanline[x * 4 + 3] = 0xff;
+#ifdef KINGPIN
+			if (pixelSize == 32)
+				fgetc (file); //discard alpha data
+			}
+#endif
 		}
 	}
 
@@ -121,7 +162,7 @@ mxTgaWrite (const char *filename, mxImage *image)
 	// write no color map
 
 	// write imagedata
-
+#ifndef KINGPIN
 	byte *data = (byte *) image->data;
 	for (int y = 0; y < image->height; y++)
 	{
@@ -133,7 +174,10 @@ mxTgaWrite (const char *filename, mxImage *image)
 			fputc ((byte) scanline[x * 3 + 0], file);
 		}
 	}
-
+#else
+	//hypov8 write without fliping Y axis
+	fwrite(image->data, (image->height*image->width * 3), 1, file);
+#endif
 	fclose (file);
 
 	return true;

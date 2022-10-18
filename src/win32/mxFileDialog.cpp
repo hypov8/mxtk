@@ -30,7 +30,7 @@ const char *
 mxGetOpenFileName (mxWindow *parent, const char *path, const char *filter)
 {
 	char szPath[_MAX_PATH] = {0}, szFilter[_MAX_PATH] = {0};
-	const char *pos;
+	const char *pos, *pos2;
 	size_t len, i = 0;
 
 	sd_path[0] = '\0';
@@ -47,9 +47,18 @@ mxGetOpenFileName (mxWindow *parent, const char *path, const char *filter)
 			memcpy (&szFilter[i], filter, len);
 			i += len + 1;
 			filter += len + 2;
+#if 0 //def KINGPIN //multi filenames
+			while (pos2 = strchr(pos, ')'))
+			{
+				memcpy (&szFilter[i], pos, strchr (pos, ')') - pos);
+			}
+#endif
 			memcpy (&szFilter[i], pos, strchr (pos, ')') - pos);
 			i += 6;
-	
+#ifdef KINGPIN //multi filenames
+			len = (strchr(pos, ')') - pos) - 5;
+			i += len;
+#endif
 		}
 		len = strlen (filter);
                 memcpy (&szFilter[i], filter, len);

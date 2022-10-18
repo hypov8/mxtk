@@ -30,14 +30,15 @@ mxPcxRead (const char *filename)
         fclose (file);
         return 0;
     }
-/*
+#ifdef KINGPIN //force kp format
     if (header.bitsPerPixel != 8 ||
 		header.version != 5)
 	{
         fclose (file);
         return 0;
     }
-
+#endif
+/*
     (void) fseek (file, -769, SEEK_END);
     if (fgetc (file) != 12) {
         fclose (file);
